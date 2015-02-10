@@ -4,8 +4,7 @@
 
 class Pump {
   private:
-    const unsigned long ML_TO_MS_CONSTANT = 500UL;
-    unsigned long shouldStopPouringAt;
+    unsigned long shouldStopPouringAt, mlToMsConstant;
     byte pumpPin, isPouring;
 
     void stopPouring() {
@@ -19,14 +18,15 @@ class Pump {
     }
 
   public:
-    Pump(int _pumpPin) {
+    Pump(int _pumpPin, double flowRate) {
+      mlToMsConstant = 1000 / flowRate;
       pumpPin = _pumpPin;
       pinMode(pumpPin, OUTPUT);
       stopPouring();
     }
 
     void pourMilliliters(unsigned long milliliters) {
-      pour(milliliters * ML_TO_MS_CONSTANT); 
+      pour(milliliters * mlToMsConstant); 
     }
     
     void pour(unsigned long milliseconds) {
@@ -44,7 +44,7 @@ class Pump {
 };
 
 YunServer server;
-Pump pumps[4] = {Pump(4), Pump(5), Pump(6), Pump(7)};
+Pump pumps[4] = {Pump(4, 2), Pump(5, 2), Pump(6, 2), Pump(7, 52)};
 
 void process(YunClient client) {
   if (!client) return;
