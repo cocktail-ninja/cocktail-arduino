@@ -25,15 +25,16 @@ class Pump {
       stopPouring();
     }
 
-    void pourMilliliters(unsigned long milliliters) {
-      pour(milliliters * mlToMsConstant); 
+    int pourMilliliters(unsigned long milliliters) {
+      return pour(milliliters * mlToMsConstant); 
     }
     
-    void pour(unsigned long milliseconds) {
+    int pour(unsigned long milliseconds) {
       if (!isPouring) {
         startPouring();
         shouldStopPouringAt = millis() + milliseconds;
       }
+      return milliseconds;
     }
 
     void loop() {
@@ -52,30 +53,66 @@ void process(YunClient client) {
   int pumpNumber[4] = {0, 0, 0, 0};
   int amounts[4] = {0, 0, 0, 0};
   
-  String make_drink = client.readStringUntil('/');
-  for (int i = 0; client.available(); i++) {
-    pumpNumber[i] = client.parseInt();
-    client.readStringUntil('-');
-    amounts[i] = client.parseInt();
-    client.readStringUntil('/');
-  }
-
-  for (int i = 0; i < 4; i ++) {
-    if (amounts[i] && pumpNumber[i]) {
-      pumps[pumpNumber[i] - 1].pourMilliliters(amounts[i]);
+  if(getDistance()<=5){
+    String make_drink = client.readStringUntil('/');
+    for (int i = 0; client.available(); i++) {
+      pumpNumber[i] = client.parseInt();
+      client.readStringUntil('-');
+      amounts[i] = client.parseInt();
+      client.readStringUntil('/');
     }
+  
+    String pouringResponse = "";
+    unsigned long maxPouringTime;
+    
+    for (int i = 0; i < 4; i ++) {
+      if (amounts[i] && pumpNumber[i]) {
+        unsigned long pouringTime = pumps[pumpNumber[i] - 1].pourMilliliters(amounts[i]);
+        if (i > 0) {
+          pouringResponse = pouringResponse + ", ";
+        }
+        pouringResponse = pouringResponse + " " + String(pumpNumber[i]) + ": " + String(pouringTime);
+        maxPouringTime = maxx(maxPouringTime, pouringTime);
+      }
+    }
+    pouringResponse = pouringResponse + ", max: " + maxPouringTime; 
+    printHeader(client, 200);
+    client.print("{ pouringTime: { " +  pouringResponse +" } }");
+  } else {
+    printHeader(client, 404);
+    client.print("{status:'glass not found'}");
   }
-
-  printHeader(client, 200);
-  client.print("{}");
-
+  
   client.stop();
 }
 
+int PINGPIN = 12;
+
+long getDistance(){
+  long duration,cm;
+  
+  pinMode(PINGPIN, OUTPUT);
+  digitalWrite(PINGPIN, LOW);
+  delayMicroseconds(2);
+  digitalWrite(PINGPIN, HIGH);
+  delayMicroseconds(5);
+  digitalWrite(PINGPIN, LOW);
+  pinMode(PINGPIN, INPUT);
+   
+  duration = pulseIn(PINGPIN, HIGH);
+  cm = microsecondsToCentimeters(duration);
+
+  return cm;
+}
+
+long microsecondsToCentimeters(long microseconds)
+{
+  return microseconds / 29 / 2;
+}
+
+
 void printHeader(YunClient client, int statusCode){
   client.println("Status: " +  String(statusCode));
-  client.println("Access-Control-Allow-Origin: *");
-  client.println("Access-Control-Allow-Methods: GET");
   client.println("Content-Type: application/json");
   client.println("Connection: close");
   client.println();
