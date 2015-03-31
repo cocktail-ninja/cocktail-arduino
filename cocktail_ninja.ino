@@ -37,15 +37,28 @@ class Pump {
       return milliseconds;
     }
 
-    void loop() {
+    void loop(){
       if (isPouring && (millis() > shouldStopPouringAt)) {
         stopPouring();
       }
-    };
+    }
+    
+    byte isBusy(){
+      return isPouring;
+    }
 };
 
 YunServer server;
 Pump pumps[4] = {Pump(4, 2), Pump(5, 2), Pump(6, 2), Pump(7, 52)};
+
+byte isBusy() {
+  for(int i = 0; i < 4; i++){
+    if (pumps[i].isBusy()) {
+      return true;
+    }
+  }
+  return false;
+}
 
 void process(YunClient client) {
   if (!client) return;
@@ -53,8 +66,16 @@ void process(YunClient client) {
   int pumpNumber[4] = {0, 0, 0, 0};
   int amounts[4] = {0, 0, 0, 0};
   
-  if(getDistance()<=5){
-    String make_drink = client.readStringUntil('/');
+  
+  if (isBusy()){
+    printHeader(client, 503);
+    client.print("{status:'busy'}");    
+  } else if(getDistance() > 5) {    
+    printHeader(client, 404);
+    client.print("{status:'glass not found'}");
+  } else {
+    String makeDrink = client.readStringUntil('/');
+    Serial.println(makeDrink);
     for (int i = 0; client.available(); i++) {
       pumpNumber[i] = client.parseInt();
       client.readStringUntil('-');
@@ -78,9 +99,6 @@ void process(YunClient client) {
     pouringResponse = pouringResponse + ", max: " + maxPouringTime; 
     printHeader(client, 200);
     client.print("{ pouringTime: { " +  pouringResponse +" } }");
-  } else {
-    printHeader(client, 404);
-    client.print("{status:'glass not found'}");
   }
   
   client.stop();
