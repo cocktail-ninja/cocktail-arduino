@@ -2,6 +2,10 @@
 #include <YunServer.h>
 #include <YunClient.h>
 
+unsigned long maxx(unsigned long a, unsigned long b){
+  return (a > b)? a : b;
+}
+
 class Pump {
   private:
     unsigned long shouldStopPouringAt, mlToMsConstant;
@@ -25,11 +29,11 @@ class Pump {
       stopPouring();
     }
 
-    int pourMilliliters(unsigned long milliliters) {
+    unsigned long pourMilliliters(unsigned long milliliters) {
       return pour(milliliters * mlToMsConstant); 
     }
     
-    int pour(unsigned long milliseconds) {
+    unsigned long pour(unsigned long milliseconds) {
       if (!isPouring) {
         startPouring();
         shouldStopPouringAt = millis() + milliseconds;
@@ -62,43 +66,58 @@ byte isBusy() {
 
 void process(YunClient client) {
   if (!client) return;
-
-  int pumpNumber[4] = {0, 0, 0, 0};
-  int amounts[4] = {0, 0, 0, 0};
   
+  String command = client.readStringUntil('/');
   
-  if (isBusy()){
-    printHeader(client, 503);
-    client.print("{status:'busy'}");    
-  } else if(getDistance() > 5) {    
-    printHeader(client, 404);
-    client.print("{status:'glass not found'}");
-  } else {
-    String makeDrink = client.readStringUntil('/');
-    Serial.println(makeDrink);
-    for (int i = 0; client.available(); i++) {
-      pumpNumber[i] = client.parseInt();
-      client.readStringUntil('-');
-      amounts[i] = client.parseInt();
-      client.readStringUntil('/');
-    }
-  
-    String pouringResponse = "";
-    unsigned long maxPouringTime;
-    
-    for (int i = 0; i < 4; i ++) {
-      if (amounts[i] && pumpNumber[i]) {
-        unsigned long pouringTime = pumps[pumpNumber[i] - 1].pourMilliliters(amounts[i]);
-        if (i > 0) {
-          pouringResponse = pouringResponse + ", ";
-        }
-        pouringResponse = pouringResponse + " " + String(pumpNumber[i]) + ": " + String(pouringTime);
-        maxPouringTime = maxx(maxPouringTime, pouringTime);
-      }
-    }
-    pouringResponse = pouringResponse + ", max: " + maxPouringTime; 
+  if (command.startsWith("status")){
     printHeader(client, 200);
-    client.print("{ pouringTime: { " +  pouringResponse +" } }");
+    if (isBusy()){
+        client.print("{status: 'busy'}");    
+    } else if(getDistance() > 5) {    
+        client.print("{status: 'glass not found'}");    
+    } else {
+        client.print("{status: 'ready'}");      
+    }
+  } else if (command.equals("make_drink")){
+      if (isBusy()){
+        printHeader(client, 503);
+        client.print("{status: 'busy'}");    
+      } else if(getDistance() > 5) {    
+        printHeader(client, 404);
+        client.print("{status: 'glass not found'}");
+      } else {
+        printHeader(client, 200);        
+        
+        int pumpNumber[4] = {0, 0, 0, 0};
+        int amounts[4] = {0, 0, 0, 0};
+        
+        for (int i = 0; client.available(); i++) {
+          pumpNumber[i] = client.parseInt();
+          client.readStringUntil('-');
+          amounts[i] = client.parseInt();
+          client.readStringUntil('/');
+        }
+      
+        String pouringResponse = "";
+        unsigned long maxPouringTime = 0L;
+        
+        for (int i = 0; i < 4; i ++) {
+          if (amounts[i] && pumpNumber[i]) {
+            unsigned long pouringTime = pumps[pumpNumber[i] - 1].pourMilliliters(amounts[i]);
+            if (i > 0) {
+              pouringResponse = pouringResponse + ", ";
+            }
+            pouringResponse = pouringResponse + " " + String(pumpNumber[i]) + ": " + (pouringTime);
+            maxPouringTime = maxx(maxPouringTime, pouringTime);
+          }
+        }
+        pouringResponse = pouringResponse + ", max: " + String(maxPouringTime); 
+
+        client.print("{ pouringTime: { " +  pouringResponse +" } }");       
+    }
+  } else {
+      printHeader(client, 405);
+      client.print("{ status: 'not recognized'}");
   }
   
   client.stop();
