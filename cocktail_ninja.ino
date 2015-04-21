@@ -123,22 +123,17 @@ void process(YunClient client) {
           client.readStringUntil('/');
         }
       
-        String pouringResponse = "";
+
         unsigned long maxPouringTime = 0L;
         
         for (int i = 0; i < NumOfPumps; i ++) {
           if (amounts[i] && pumpNumber[i]) {
             unsigned long pouringTime = pumps[pumpNumber[i] - 1].pourMilliliters(amounts[i]);
-            if (i > 0) {
-              pouringResponse = pouringResponse + ", ";
-            }
-            pouringResponse = pouringResponse + " \"" + String(pumpNumber[i]) + "\": " + (pouringTime);
             maxPouringTime = maxx(maxPouringTime, pouringTime);
           }
         }
-        pouringResponse = pouringResponse + ",\"max\": " + String(maxPouringTime); 
 
-        client.print("{ \"pouringTime\": { " +  pouringResponse +" } }");       
+        client.print("{ \"ready_in\": " + String(maxPouringTime) + " }");       
     }
   } else {
       printHeader(client, 405);
