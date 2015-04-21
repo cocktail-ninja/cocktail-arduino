@@ -54,14 +54,19 @@ class Pump {
 
 YunServer server;
 
-#define NumOfPumps 5
+#define NumOfPumps 9
 int PUMP_1 = 2;
 int PUMP_2 = 3;
 int PUMP_3 = 4;
 int PUMP_4 = 5;
 int PUMP_5 = 6;
+int PUMP_6 = 7;
+int PUMP_7 = 8;
+int PUMP_8 = 9;
+int PUMP_9 = 10;
 
 int PUMP_FLOWRATE = 2;
+int VALVE_FLOWRATE = 52;
 int PINGPIN = 11;
 
 Pump pumps[NumOfPumps] = {
@@ -69,7 +74,11 @@ Pump pumps[NumOfPumps] = {
   Pump(PUMP_2, PUMP_FLOWRATE), 
   Pump(PUMP_3, PUMP_FLOWRATE), 
   Pump(PUMP_4, PUMP_FLOWRATE), 
-  Pump(PUMP_5, PUMP_FLOWRATE)
+  Pump(PUMP_5, PUMP_FLOWRATE), 
+  Pump(PUMP_6, VALVE_FLOWRATE), 
+  Pump(PUMP_7, VALVE_FLOWRATE), 
+  Pump(PUMP_8, VALVE_FLOWRATE), 
+  Pump(PUMP_9, VALVE_FLOWRATE)
 };
 
 byte isBusy() {
@@ -113,8 +122,8 @@ void process(YunClient client) {
       } else {
         printHeader(client, 200);        
 
-        int pumpNumber[NumOfPumps] = {0, 0, 0, 0, 0};
-        int amounts[NumOfPumps] = {0, 0, 0, 0, 0};
+        int pumpNumber[NumOfPumps] = {0, 0, 0, 0, 0, 0, 0, 0 ,0};
+        int amounts[NumOfPumps] = {0, 0, 0, 0, 0, 0, 0, 0 ,0};
         
         for (int i = 0; client.available(); i++) {
           pumpNumber[i] = client.parseInt();
