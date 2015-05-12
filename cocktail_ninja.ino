@@ -8,7 +8,7 @@ unsigned long maxx(unsigned long a, unsigned long b){
 
 class Pump {
 	private:
-		unsigned long shouldStopPouringAt, mlToMsConstant;
+		unsigned long shouldStopPouringAt, shouldStartsPouringAt, mlToMsConstant;
 		byte pumpPin, isPouring;
 
 		void stopPouring() {
@@ -29,20 +29,22 @@ class Pump {
 			stopPouring();
 		}
 
-		unsigned long pourMilliliters(unsigned long milliliters) {
-			return pour(milliliters * mlToMsConstant); 
+		unsigned long pourMilliliters(unsigned long milliliters, unsigned long startsFrom) {
+			return pour(milliliters * mlToMsConstant, startsFrom); 
 		}
 		
-		unsigned long pour(unsigned long milliseconds) {
-			if (!isPouring) {
-				startPouring();
-				shouldStopPouringAt = millis() + milliseconds;
-			}
+		unsigned long pour(unsigned long milliseconds, unsigned long startsFrom) {
+			unsigned long currentTime = millis();
+			shouldStartsPouringAt = currentTime + startsFrom;
+			shouldStopPouringAt = shouldStartsPouringAt + milliseconds;
 			return milliseconds;
 		}
 
 		void loop(){
-			if (isPouring && (millis() > shouldStopPouringAt)) {
+			unsigned long currentTime = millis();
+			if (!isPouring && currentTime > shouldStartsPouringAt && currentTime < shouldStopPouringAt) {
+				startPouring();
+			} else if (isPouring && (currentTime > shouldStopPouringAt)) {
 				stopPouring();
 			}
 		}
@@ -54,7 +56,9 @@ class Pump {
 
 YunServer server;
 
-#define NumOfPumps 9
+#define NumOfAlcoholPumps 5
+#define NumOfDrinkValves 4
+#define NumOfIngredients 9
 int PUMP_1 = 2;
 int PUMP_2 = 3;
 int PUMP_3 = 4;
@@ -69,7 +73,7 @@ int PUMP_FLOWRATE = 2;
 int VALVE_FLOWRATE = 52;
 int PINGPIN = 11;
 
-Pump pumps[NumOfPumps] = {
+Pump pumps[NumOfIngredients] = {
 	Pump(PUMP_1, PUMP_FLOWRATE), 
 	Pump(PUMP_2, PUMP_FLOWRATE), 
 	Pump(PUMP_3, PUMP_FLOWRATE), 
@@ -82,7 +86,7 @@ Pump pumps[NumOfPumps] = {
 };
 
 byte isBusy() {
-	for(int i = 0; i < NumOfPumps; i++){
+	for(int i = 0; i < NumOfIngredients; i++){
 		if (pumps[i].isBusy()) {
 			return true;
 		}
@@ -144,26 +148,34 @@ void processMakeDrinkResponse(YunClient client){
 	} else if(isGlassNotFound()) {    
 		printStatus(client, 404, "status", "glass not found");
 	} else {
-		int pumpNumber[NumOfPumps] = {0, 0, 0, 0, 0, 0, 0, 0 ,0};
-		int amounts[NumOfPumps] = {0, 0, 0, 0, 0, 0, 0, 0 ,0};
+		int amounts[NumOfIngredients] = {0, 0, 0, 0, 0, 0, 0, 0 ,0};
 		
 		for (int i = 0; client.available(); i++) {
-			pumpNumber[i] = client.parseInt();
+			int pumpNumber = client.parseInt() - 1;
 			client.readStringUntil('-');
-			amounts[i] = client.parseInt();
+			amounts[pumpNumber] = client.parseInt();
 			client.readStringUntil('/');
 		}
 	
-		unsigned long maxPouringTime = 0L;
-		
-		for (int i = 0; i < NumOfPumps; i ++) {
-			if (amounts[i] && pumpNumber[i]) {
-				unsigned long pouringTime = pumps[pumpNumber[i] - 1].pourMilliliters(amounts[i]);
-				maxPouringTime = maxx(maxPouringTime, pouringTime);
+		unsigned long alcoholPouringTime = 0L;
+		for (int i = 0; i < NumOfAlcoholPumps; i++) {
+			if (amounts[i]) {
+				unsigned long pouringTime = pumps[i].pourMilliliters(amounts[i], 0L);
+				alcoholPouringTime = maxx(alcoholPouringTime, pouringTime);
 			}
 		}
 
-		printStatus(client, 200, "ready_in", String(maxPouringTime));
+
+		unsigned long nonAlcoholPouringTime = 0L;
+		for (int i = NumOfAlcoholPumps; i < NumOfIngredients; i++) {
+			if (amounts[i]) {
+				unsigned long pouringTime = pumps[i].pourMilliliters(amounts[i], alcoholPouringTime);
+				nonAlcoholPouringTime = maxx(nonAlcoholPouringTime, pouringTime);
+			}
+		}
+
+
+		printStatus(client, 200, "ready_in", String(alcoholPouringTime + nonAlcoholPouringTime));
 	}
 }
 
