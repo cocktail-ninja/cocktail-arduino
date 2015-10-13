@@ -56,22 +56,23 @@ class Pump {
 
 YunServer server;
 
-#define NumOfAlcoholPumps 5
+#define NumOfAlcoholPumps 6
 #define NumOfDrinkValves 4
-#define NumOfIngredients 9
-int PUMP_1 = 2;
-int PUMP_2 = 3;
-int PUMP_3 = 4;
-int PUMP_4 = 5;
-int PUMP_5 = 6;
-int PUMP_6 = 7;
-int PUMP_7 = 8;
-int PUMP_8 = 9;
-int PUMP_9 = 10;
+#define NumOfIngredients 10
+int PUMP_1 = 7;
+int PUMP_2 = 12;
+int PUMP_3 = 11;
+int PUMP_4 = 10;
+int PUMP_5 = 9;
+int PUMP_6 = 8;
+int VALVE_1 = A1;
+int VALVE_2 = A2;
+int VALVE_3 = A3;
+int VALVE_4 = A4;
 
 int PUMP_FLOWRATE = 2;
 int VALVE_FLOWRATE = 52;
-int PINGPIN = 11;
+int PINGPIN = 3;
 
 Pump pumps[NumOfIngredients] = {
 	Pump(PUMP_1, PUMP_FLOWRATE), 
@@ -79,10 +80,11 @@ Pump pumps[NumOfIngredients] = {
 	Pump(PUMP_3, PUMP_FLOWRATE), 
 	Pump(PUMP_4, PUMP_FLOWRATE), 
 	Pump(PUMP_5, PUMP_FLOWRATE), 
-	Pump(PUMP_6, VALVE_FLOWRATE), 
-	Pump(PUMP_7, VALVE_FLOWRATE), 
-	Pump(PUMP_8, VALVE_FLOWRATE), 
-	Pump(PUMP_9, VALVE_FLOWRATE)
+	Pump(PUMP_6, PUMP_FLOWRATE), 
+	Pump(VALVE_1, VALVE_FLOWRATE), 
+	Pump(VALVE_2, VALVE_FLOWRATE), 
+	Pump(VALVE_3, VALVE_FLOWRATE), 
+	Pump(VALVE_4, VALVE_FLOWRATE)
 };
 
 byte isBusy() {
@@ -148,7 +150,7 @@ void processMakeDrinkResponse(YunClient client){
 	} else if(isGlassNotFound()) {    
 		printStatus(client, 404, "status", "glass not found");
 	} else {
-		int amounts[NumOfIngredients] = {0, 0, 0, 0, 0, 0, 0, 0 ,0};
+		int amounts[NumOfIngredients] = {0, 0, 0, 0, 0, 0, 0, 0 ,0, 0};
 		
 		for (int i = 0; client.available(); i++) {
 			int pumpNumber = client.parseInt() - 1;
