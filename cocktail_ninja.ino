@@ -1,6 +1,7 @@
 #include <Bridge.h>
 #include <YunServer.h>
 #include <YunClient.h>
+#include <EEPROM.h>
 
 unsigned long maxx(unsigned long a, unsigned long b){
 	return (a > b)? a : b;
@@ -10,6 +11,7 @@ class Pump {
 	private:
 		unsigned long shouldStopPouringAt, shouldStartsPouringAt, mlToMsConstant;
 		byte pumpPin, isPouring;
+		String cid;
 
 		void stopPouring() {
 			digitalWrite(pumpPin, HIGH);
@@ -22,17 +24,18 @@ class Pump {
 		}
 
 	public:
-		Pump(int _pumpPin, double flowRate) {
+		Pump(int _pumpPin, String _cid, double flowRate) {
 			mlToMsConstant = 1000 / flowRate;
 			pumpPin = _pumpPin;
+			cid = _cid;
 			pinMode(pumpPin, OUTPUT);
 			stopPouring();
 		}
 
 		unsigned long pourMilliliters(unsigned long milliliters, unsigned long startsFrom) {
-			return pour(milliliters * mlToMsConstant, startsFrom); 
+			return pour(milliliters * mlToMsConstant, startsFrom);
 		}
-		
+
 		unsigned long pour(unsigned long milliseconds, unsigned long startsFrom) {
 			unsigned long currentTime = millis();
 			shouldStartsPouringAt = currentTime + startsFrom;
@@ -48,9 +51,13 @@ class Pump {
 				stopPouring();
 			}
 		}
-		
+
 		byte isBusy(){
 			return isPouring;
+		}
+
+		String toJson() {
+			return "{\"cid\":\"" + cid + "\"}";
 		}
 };
 
@@ -74,18 +81,27 @@ int PUMP_FLOWRATE = 2;
 int VALVE_FLOWRATE = 52;
 int PINGPIN = 3;
 
+String COMPONENT_IDS[NumOfIngredients] = {"P1", "P2", "P3", "P4", "P5", "P6", "V1", "V2", "V3", "V4"};
 Pump pumps[NumOfIngredients] = {
-	Pump(PUMP_1, PUMP_FLOWRATE), 
-	Pump(PUMP_2, PUMP_FLOWRATE), 
-	Pump(PUMP_3, PUMP_FLOWRATE), 
-	Pump(PUMP_4, PUMP_FLOWRATE), 
-	Pump(PUMP_5, PUMP_FLOWRATE), 
-	Pump(PUMP_6, PUMP_FLOWRATE), 
-	Pump(VALVE_1, VALVE_FLOWRATE), 
-	Pump(VALVE_2, VALVE_FLOWRATE), 
-	Pump(VALVE_3, VALVE_FLOWRATE), 
-	Pump(VALVE_4, VALVE_FLOWRATE)
+	Pump(PUMP_1, "P1", PUMP_FLOWRATE),
+	Pump(PUMP_2, "P2", PUMP_FLOWRATE),
+	Pump(PUMP_3, "P3", PUMP_FLOWRATE),
+	Pump(PUMP_4, "P4", PUMP_FLOWRATE),
+	Pump(PUMP_5, "P5", PUMP_FLOWRATE),
+	Pump(PUMP_6, "P6", PUMP_FLOWRATE),
+	Pump(VALVE_1, "V1", VALVE_FLOWRATE),
+	Pump(VALVE_2, "V2", VALVE_FLOWRATE),
+	Pump(VALVE_3, "V3", VALVE_FLOWRATE),
+	Pump(VALVE_4, "V4", VALVE_FLOWRATE)
 };
+
+int findComponentIndex(String cid) {
+	cid = cid.toUpperCase();
+	for (int i = 0; i < NumOfIngredients; ++i) {
+		if (COMPONENT_IDS[i] == cid) return i;
+	}
+	return -1;
+}
 
 byte isBusy() {
 	for(int i = 0; i < NumOfIngredients; i++){
@@ -98,7 +114,7 @@ byte isBusy() {
 
 long getDistance(){
 	long duration,cm;
-	
+
 	pinMode(PINGPIN, OUTPUT);
 	digitalWrite(PINGPIN, LOW);
 	delayMicroseconds(2);
@@ -106,7 +122,7 @@ long getDistance(){
 	delayMicroseconds(5);
 	digitalWrite(PINGPIN, LOW);
 	pinMode(PINGPIN, INPUT);
-	 
+
 	duration = pulseIn(PINGPIN, HIGH);
 	cm = microsecondsToCentimeters(duration);
 
@@ -123,9 +139,8 @@ bool isGlassNotFound() {
 
 void printStatus(YunClient client, int statusCode, String key, String value) {
 	printHeader(client, statusCode);
-	client.print("{\"" + key + "\": \"" + value + "\"}");    
+	client.print("{\"" + key + "\": \"" + value + "\"}");
 }
-
 
 void printHeader(YunClient client, int statusCode){
 	client.println("Status: " +  String(statusCode));
@@ -137,8 +152,8 @@ void printHeader(YunClient client, int statusCode){
 void processStatusResponse(YunClient client){
 	if (isBusy()){
 		printStatus(client, 200, "status", "busy");
-	} else if (isGlassNotFound()) { 
-		printStatus(client, 200, "status", "glass not found"); 
+	} else if (isGlassNotFound()) {
+		printStatus(client, 200, "status", "glass not found");
 	} else {
 		printStatus(client, 200, "status", "ready");
 	}
@@ -147,18 +162,23 @@ void processStatusResponse(YunClient client){
 void processMakeDrinkResponse(YunClient client){
 	if (isBusy()){
 		printStatus(client, 503, "status", "busy");
-	} else if(isGlassNotFound()) {    
+	} else if(isGlassNotFound()) {
 		printStatus(client, 404, "status", "glass not found");
 	} else {
+
 		int amounts[NumOfIngredients] = {0, 0, 0, 0, 0, 0, 0, 0 ,0, 0};
-		
-		for (int i = 0; client.available(); i++) {
-			int pumpNumber = client.parseInt() - 1;
-			client.readStringUntil('-');
+
+		while (client.available()) {
+			String cid = client.readStringUntil('-');
+			int pumpNumber = findComponentIndex(cid);
+			if (pumpNumber < 0) {
+				client.readStringUntil('/');
+				continue;
+			}
 			amounts[pumpNumber] = client.parseInt();
 			client.readStringUntil('/');
 		}
-	
+
 		unsigned long alcoholPouringTime = 0L;
 		for (int i = 0; i < NumOfAlcoholPumps; i++) {
 			if (amounts[i]) {
@@ -166,7 +186,6 @@ void processMakeDrinkResponse(YunClient client){
 				alcoholPouringTime = maxx(alcoholPouringTime, pouringTime);
 			}
 		}
-
 
 		unsigned long nonAlcoholPouringTime = 0L;
 		for (int i = NumOfAlcoholPumps; i < NumOfIngredients; i++) {
@@ -176,24 +195,37 @@ void processMakeDrinkResponse(YunClient client){
 			}
 		}
 
-
 		printStatus(client, 200, "ready_in", String(alcoholPouringTime + nonAlcoholPouringTime));
 	}
 }
 
+void processIngredientsResponse(YunClient client) {
+	String response = "[";
+	for (int i = 0; i < NumOfIngredients; ++i) {
+		response += pumps[i].toJson();
+		if (i < NumOfIngredients - 1) response += ",";
+	}
+	response += "]";
+
+	printHeader(client, 200);
+	client.print(response);
+}
+
 void process(YunClient client) {
 	if (!client) return;
-	
+
 	String command = client.readStringUntil('/');
-	
+
 	if (command.startsWith("status")){
 		processStatusResponse(client);
 	} else if (command.equals("make_drink")){
 		processMakeDrinkResponse(client);
+	} else if (command.equals("ingredients")) {
+		processIngredientsResponse(client);
 	} else {
 		printStatus(client, 405, "status", "not recognized");
 	}
-	
+
 	client.stop();
 }
 
