@@ -66,16 +66,16 @@ YunServer server;
 #define NumOfAlcoholPumps 6
 #define NumOfDrinkValves 4
 #define NumOfIngredients 10
-int PUMP_1 = 7;
-int PUMP_2 = 12;
-int PUMP_3 = 11;
-int PUMP_4 = 10;
-int PUMP_5 = 9;
-int PUMP_6 = 8;
-int VALVE_1 = A1;
-int VALVE_2 = A2;
-int VALVE_3 = A3;
-int VALVE_4 = A4;
+int PUMP_1 = 8;
+int PUMP_2 = 9;
+int PUMP_3 = 10;
+int PUMP_4 = 11;
+int PUMP_5 = 12;
+int PUMP_6 = 7;
+int VALVE_1 = A4;
+int VALVE_2 = A3;
+int VALVE_3 = A2;
+int VALVE_4 = A1;
 
 int PUMP_FLOWRATE = 2;
 int VALVE_FLOWRATE = 52;
@@ -96,9 +96,10 @@ Pump pumps[NumOfIngredients] = {
 };
 
 int findComponentIndex(String cid) {
-	cid = cid.toUpperCase();
 	for (int i = 0; i < NumOfIngredients; ++i) {
-		if (COMPONENT_IDS[i] == cid) return i;
+		if (COMPONENT_IDS[i].equalsIgnoreCase(cid)) {
+		  return i;
+		}
 	}
 	return -1;
 }
@@ -151,9 +152,9 @@ void printHeader(YunClient client, int statusCode){
 
 void processStatusResponse(YunClient client){
 	if (isBusy()){
-		printStatus(client, 200, "status", "busy");
+		printStatus(client, 503, "status", "busy");
 	} else if (isGlassNotFound()) {
-		printStatus(client, 200, "status", "glass not found");
+		printStatus(client, 404, "status", "glass not found");
 	} else {
 		printStatus(client, 200, "status", "ready");
 	}
