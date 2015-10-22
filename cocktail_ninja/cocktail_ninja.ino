@@ -150,6 +150,28 @@ void printHeader(YunClient client, int statusCode){
 	client.println();
 }
 
+int pourAlcoholPumps (int amounts[8], long startTime) {
+	unsigned long totalPouringTime = 0L;
+	for (int i = 0; i < NumOfAlcoholPumps; i++) {
+		if (amounts[i]) {
+			unsigned long pouringTime = pumps[i].pourMilliliters(amounts[i], startTime);
+			totalPouringTime = maxx(totalPouringTime, pouringTime);
+		}
+	}
+	return totalPouringTime;
+}
+
+int pourNonAlcoholValves (int amounts[8], long startTime) {
+	unsigned long totalPouringTime = 0L;
+	for (int i = NumOfAlcoholPumps; i < NumOfIngredients; i++) {
+		if (amounts[i]) {
+			unsigned long pouringTime = pumps[i].pourMilliliters(amounts[i], startTime);
+			totalPouringTime = maxx(totalPouringTime, pouringTime);
+		}
+	}
+	return totalPouringTime;
+}
+
 void processStatusResponse(YunClient client){
 	if (isBusy()){
 		printStatus(client, 503, "status", "busy");
@@ -166,7 +188,6 @@ void processMakeDrinkResponse(YunClient client){
 	} else if(isGlassNotFound()) {
 		printStatus(client, 404, "status", "glass not found");
 	} else {
-
 		int amounts[NumOfIngredients] = {0, 0, 0, 0, 0, 0, 0, 0 ,0, 0};
 
 		while (client.available()) {
@@ -180,21 +201,8 @@ void processMakeDrinkResponse(YunClient client){
 			client.readStringUntil('/');
 		}
 
-		unsigned long alcoholPouringTime = 0L;
-		for (int i = 0; i < NumOfAlcoholPumps; i++) {
-			if (amounts[i]) {
-				unsigned long pouringTime = pumps[i].pourMilliliters(amounts[i], 0L);
-				alcoholPouringTime = maxx(alcoholPouringTime, pouringTime);
-			}
-		}
-
-		unsigned long nonAlcoholPouringTime = 0L;
-		for (int i = NumOfAlcoholPumps; i < NumOfIngredients; i++) {
-			if (amounts[i]) {
-				unsigned long pouringTime = pumps[i].pourMilliliters(amounts[i], alcoholPouringTime);
-				nonAlcoholPouringTime = maxx(nonAlcoholPouringTime, pouringTime);
-			}
-		}
+		unsigned long alcoholPouringTime = pourAlcoholPumps(amounts, 0L);
+		unsigned long nonAlcoholPouringTime = pourNonAlcoholValves(amounts, alcoholPouringTime);
 
 		printStatus(client, 200, "ready_in", String(alcoholPouringTime + nonAlcoholPouringTime));
 	}
@@ -212,6 +220,28 @@ void processIngredientsResponse(YunClient client) {
 	client.print(response);
 }
 
+void processCleanResponse(YunClient client) {
+	if (isBusy()){
+		printStatus(client, 503, "status", "busy");
+		return;
+	}
+
+	int duration = 60;
+	if (client.available()) {
+		duration = client.parseInt();
+		client.readStringUntil('/');
+	}
+
+	int alcoholAmount = duration * PUMP_FLOWRATE;
+	int nonAlcoholAmount = duration * VALVE_FLOWRATE;
+	int amounts[NumOfIngredients] = {
+		alcoholAmount, alcoholAmount, alcoholAmount, alcoholAmount, alcoholAmount, alcoholAmount,
+		nonAlcoholAmount, nonAlcoholAmount ,nonAlcoholAmount, nonAlcoholAmount};
+	pourAlcoholPumps(amounts, 0L);
+	pourNonAlcoholValves(amounts, 0L);
+	printStatus(client, 200, "completed_in", String(duration));
+}
+
 void process(YunClient client) {
 	if (!client) return;
 
@@ -223,6 +253,8 @@ void process(YunClient client) {
 		processMakeDrinkResponse(client);
 	} else if (command.equals("ingredients")) {
 		processIngredientsResponse(client);
+	} else if (command.equals("clean")) {
+		processCleanResponse(client);
 	} else {
 		printStatus(client, 405, "status", "not recognized");
 	}
