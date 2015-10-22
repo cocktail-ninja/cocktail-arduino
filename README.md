@@ -2,7 +2,7 @@
 
 ### API Specifications
 
-#### [/status](#)
+#### [GET /status](#)
 
 __Response:__
 
@@ -15,7 +15,7 @@ __Response:__
     STATUS 200
     { "status": "ready" }
 
-#### [/make_drink](#)
+#### [GET /make_drink](#)
 
 __Request:__ `/{cid}-{amount}`
 
@@ -34,7 +34,7 @@ __Response:__
 { "ready_in": 1500 }
 ```
 
-#### [/clean](#)
+#### [GET /clean](#)
 
 __Request:__ `/{cleaning_duration}`
 
