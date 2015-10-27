@@ -33,17 +33,3 @@ __Response:__
 ```
 { "ready_in": 1500 }
 ```
-
-#### [GET /clean](#)
-
-__Request:__ `/{cleaning_duration}`
-
-- `cleaning_duration`: Cleaning duration (in second, default 60s)
-
-E.g. cleaning the machine for 30 second
-
-    /clean/30
-
-__Response:__
-
-    { "completed_in": 30 }
